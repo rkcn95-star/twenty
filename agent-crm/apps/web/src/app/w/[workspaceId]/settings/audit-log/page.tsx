@@ -66,7 +66,7 @@ function AuditLog() {
                   <td className="h-8 border-b px-3">{names.get(entry.principalId) ?? entry.principalId.slice(0, 8)}</td>
                   <td className="h-8 border-b px-3"><code className="text-xs">{entry.tool}</code></td>
                   <td className="h-8 border-b px-3">
-                    <Badge variant="secondary" className={`rounded-[4px] font-normal ${entry.outcome === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-destructive'}`}>{entry.outcome === 'ok' ? 'Succeeded' : 'Failed'}</Badge>
+                    <Badge variant="secondary" className={`rounded-[4px] font-normal ${entry.outcome === 'ok' ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400' : 'bg-red-50 text-destructive dark:bg-red-950'}`}>{entry.outcome === 'ok' ? 'Succeeded' : 'Failed'}</Badge>
                   </td>
                   <td className="h-8 border-b px-3 tabular-nums text-muted-foreground">{entry.rowCount ?? '—'}</td>
                   <td className="h-8 max-w-[320px] truncate border-b px-3 text-muted-foreground" title={entry.detail ?? undefined}>{entry.detail ?? ''}</td>

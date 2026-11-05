@@ -2,14 +2,17 @@
 
 import Link from 'next/link';
 import { MailCheck } from 'lucide-react';
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { AuthCard } from '@/components/auth-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authClient } from '@/lib/auth-client';
+import { safeNext } from '@/lib/next-url';
 
-export default function SignUpPage() {
+function SignUpForm() {
+  const next = safeNext(useSearchParams().get('next'));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -21,7 +24,7 @@ export default function SignUpPage() {
     setPending(true);
     setError(null);
     const { error: failure } = await authClient.signUp.email({
-      email, name: String(form.get('name')), password: String(form.get('password')), callbackURL: '/w',
+      email, name: String(form.get('name')), password: String(form.get('password')), callbackURL: next ?? '/w',
     });
     setPending(false);
     if (failure) setError(failure.message ?? 'Sign-up failed');
@@ -35,7 +38,7 @@ export default function SignUpPage() {
           <MailCheck className="mt-0.5 size-4 shrink-0 text-green-600" />
           <p>We sent a verification link to <strong className="text-foreground">{sentTo}</strong>. Open it to finish signing up.</p>
         </div>
-        <p className="mt-4"><Link className="text-blue hover:underline" href="/sign-in">Back to sign in</Link></p>
+        <p className="mt-4"><Link className="text-blue hover:underline" href={next ? `/sign-in?next=${encodeURIComponent(next)}` : '/sign-in'}>Back to sign in</Link></p>
       </AuthCard>
     );
   }
@@ -58,14 +61,18 @@ export default function SignUpPage() {
         {error ? <p role="alert" className="text-destructive">{error}</p> : null}
         <Button type="submit" disabled={pending}>{pending ? 'Creating…' : 'Create account'}</Button>
         {process.env.NEXT_PUBLIC_GOOGLE_AUTH === 'true' ? (
-          <Button type="button" variant="outline" onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/w' })}>
+          <Button type="button" variant="outline" onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: next ?? '/w' })}>
             Continue with Google
           </Button>
         ) : null}
       </form>
       <p className="mt-4 text-muted-foreground">
-        Already have an account? <Link className="text-blue hover:underline" href="/sign-in">Sign in</Link>
+        Already have an account? <Link className="text-blue hover:underline" href={next ? `/sign-in?next=${encodeURIComponent(next)}` : '/sign-in'}>Sign in</Link>
       </p>
     </AuthCard>
   );
+}
+
+export default function SignUpPage() {
+  return <Suspense><SignUpForm /></Suspense>;
 }

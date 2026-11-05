@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  BarChart3, Boxes, Check, ChevronsUpDown, History, Home, KeyRound, LogOut, Plus, Shield, ShieldCheck, Table2, Users,
+  BarChart3, Boxes, Check, ChevronsUpDown, FileText, History, Home, KeyRound, LayoutGrid, LogOut, Plus, Shield, ShieldCheck, Table2, Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { authClient } from '@/lib/auth-client';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { useWorkspace } from '@/components/workspace-context';
 
 function NavItem({ href, icon, children, exact = false }: { href: string; icon: React.ReactNode; children: React.ReactNode; exact?: boolean }) {
@@ -93,8 +94,10 @@ export function Sidebar() {
           ))}
         </Section>
 
-        <Section label="Analytics">
+        <Section label="Build and run">
           <NavItem href={`${base}/reports`} icon={<BarChart3 />}>Reports</NavItem>
+          <NavItem href={`${base}/forms`} icon={<FileText />}>Forms</NavItem>
+          <NavItem href={`${base}/grids`} icon={<LayoutGrid />}>Data grids</NavItem>
         </Section>
 
         <Section label="Settings">
@@ -109,6 +112,7 @@ export function Sidebar() {
           ) : null}
         </Section>
       </nav>
+      <ThemeToggle />
       {metadata.tenancy === 'shared' ? (
         <p className="flex items-center gap-1.5 px-2 pt-2 text-xs text-muted-foreground"><KeyRound className="size-3" /> Shared data model</p>
       ) : null}

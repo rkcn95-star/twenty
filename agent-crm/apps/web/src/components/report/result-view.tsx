@@ -71,7 +71,7 @@ export function ResultView({ result, visualization }: { result: ReportResult; vi
           </PieChart>
         ) : type === 'line' ? (
           <LineChart data={data}>
-            <CartesianGrid stroke="#ebebeb" vertical={false} />
+            <CartesianGrid stroke="var(--border)" vertical={false} />
             <XAxis dataKey={x} tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} />
             <Tooltip />
@@ -79,10 +79,10 @@ export function ResultView({ result, visualization }: { result: ReportResult; vi
           </LineChart>
         ) : (
           <BarChart data={data}>
-            <CartesianGrid stroke="#ebebeb" vertical={false} />
+            <CartesianGrid stroke="var(--border)" vertical={false} />
             <XAxis dataKey={x} tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip cursor={{ fill: '#f1f1f1' }} />
+            <Tooltip cursor={{ fill: 'var(--accent)' }} />
             {y.map((key, index) => <Bar key={key} dataKey={key} fill={COLORS[index % COLORS.length]} radius={[3, 3, 0, 0]} />)}
           </BarChart>
         )}

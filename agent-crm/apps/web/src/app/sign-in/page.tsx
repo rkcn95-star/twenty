@@ -1,16 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { AuthCard } from '@/components/auth-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authClient } from '@/lib/auth-client';
+import { safeNext } from '@/lib/next-url';
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
+  const next = safeNext(useSearchParams().get('next'));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -25,7 +27,7 @@ export default function SignInPage() {
       setError(failure.status === 403 ? 'Verify your email first. Check your inbox for the link.' : (failure.message ?? 'Sign-in failed'));
       return;
     }
-    router.push('/w');
+    router.push(next ?? '/w');
   };
 
   return (
@@ -42,14 +44,18 @@ export default function SignInPage() {
         {error ? <p role="alert" className="text-destructive">{error}</p> : null}
         <Button type="submit" disabled={pending}>{pending ? 'Signing in…' : 'Sign in'}</Button>
         {process.env.NEXT_PUBLIC_GOOGLE_AUTH === 'true' ? (
-          <Button type="button" variant="outline" onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/w' })}>
+          <Button type="button" variant="outline" onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: next ?? '/w' })}>
             Continue with Google
           </Button>
         ) : null}
       </form>
       <p className="mt-4 text-muted-foreground">
-        New here? <Link className="text-blue hover:underline" href="/sign-up">Create an account</Link>
+        New here? <Link className="text-blue hover:underline" href={next ? `/sign-up?next=${encodeURIComponent(next)}` : '/sign-up'}>Create an account</Link>
       </p>
     </AuthCard>
   );
+}
+
+export default function SignInPage() {
+  return <Suspense><SignInForm /></Suspense>;
 }

@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start -p 3001",
     "typecheck": "tsc --noEmit",
-    "smoke": "node e2e/smoke.mjs"
+    "smoke": "node e2e/smoke.mjs && node e2e/builders.mjs"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.4",

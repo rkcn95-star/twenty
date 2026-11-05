@@ -36,6 +36,32 @@
   --chart-5: #d45452;
 }
 
+/* Dark tokens follow Twenty's dark theme. */
+.dark {
+  --background: #1b1b1b;
+  --foreground: #ebebeb;
+  --card: #1b1b1b;
+  --card-foreground: #ebebeb;
+  --popover: #222222;
+  --popover-foreground: #ebebeb;
+  --primary: #ebebeb;
+  --primary-foreground: #1b1b1b;
+  --secondary: #2a2a2a;
+  --secondary-foreground: #ebebeb;
+  --muted: #212121;
+  --muted-foreground: #9a9a9a;
+  --accent: #2a2a2a;
+  --accent-foreground: #ebebeb;
+  --destructive: #e5726f;
+  --border: #2c2c2c;
+  --input: #3a3a3a;
+  --ring: #6b86ff;
+  --app-background: #141414;
+  --blue: #7f97ff;
+  --blue-soft: #1d2539;
+  --chart-1: #7f97ff;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -83,6 +109,7 @@
     font-size: 13px;
     line-height: 1.4;
   }
+  .dark body { color-scheme: dark; }
   button:not(:disabled),
   [role='button']:not([aria-disabled='true']) {
     cursor: pointer;

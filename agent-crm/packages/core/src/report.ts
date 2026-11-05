@@ -202,7 +202,7 @@ export const compileReport = (definition: ReportDefinition, view: ReportView): C
 
   const orderParts = definition.orderBy.map((order) => {
     if (!seenKeys.has(order.key)) throw new AppError('validation', `orderBy references unknown column "${order.key}"`);
-    return `${quoteIdent(order.key)} ${order.direction === 'desc' ? 'DESC' : 'ASC'}`;
+    return `${quoteIdent(order.key)} ${order.direction === 'desc' ? 'DESC' : 'ASC'} NULLS LAST`;
   });
 
   const sql = [

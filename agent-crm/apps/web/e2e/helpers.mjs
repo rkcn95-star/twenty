@@ -77,3 +77,17 @@ export const eventually = async (read, predicate, message, timeout = 8000) => {
   }
   throw new Error(`FAILED: ${message} (last value: ${JSON.stringify(last)})`);
 };
+
+// Calls a tool as the signed-in browser user, so a test can set up data without clicking through every screen.
+export const api = (page, workspaceId, tool, args = {}) =>
+  page.evaluate(
+    async ({ workspaceId, tool, args }) => {
+      const response = await fetch(`/v1/tools/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-workspace-id': workspaceId }, body: JSON.stringify(args) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(`${tool}: ${body.error}`);
+      return body.result;
+    },
+    { workspaceId, tool, args },
+  );
+
+export const workspaceIdOf = (url) => url.match(/\/w\/([0-9a-f-]{36})/)[1];

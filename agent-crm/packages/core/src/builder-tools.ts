@@ -124,7 +124,7 @@ export const builderTools = (env: ToolEnvironment): ToolDefinition[] => {
         const access = env.permissions.objects.get(metadata.objects.find((object) => object.namePlural === definition.object)?.id ?? '');
         const allowed = (kind: string) => kind === 'delete' ? access?.delete : kind === 'set_fields' ? access?.update : true;
         const describeActions = (actions: GridDefinition['rowActions']) =>
-          actions.map((action) => ({ key: action.key, label: action.label, kind: action.kind, confirm: action.confirm, enabled: Boolean(allowed(action.kind)) }));
+          actions.map((action) => ({ key: action.key, label: action.label, kind: action.kind, confirm: action.confirm, form: action.form, enabled: Boolean(allowed(action.kind)) }));
         return {
           columns: definition.columns.map((column) => ({ ...column, key: (column.via ? `${column.via}_${column.field}` : column.field).slice(0, 40) })),
           rows: rows.rows,

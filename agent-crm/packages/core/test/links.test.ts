@@ -109,6 +109,45 @@ describe.each(['isolated', 'shared'] as const)('many-to-many in %s mode', (mode)
     ).rejects.toThrow(/many-to-many/);
   });
 
+  it('saves many-to-many values from a form in the same transaction', async () => {
+    const { admin } = setup();
+    await exec(admin, 'save_form', { name: 'tagged_deal', definition: { kind: 'single', object: 'deals', fields: [{ name: 'title', required: true }, { name: 'tags' }] } });
+    const [one, two, three] = await Promise.all(['f1', 'f2', 'f3'].map((name) => exec(admin, 'create_one_tag', { data: { name } })));
+    const created = await exec(admin, 'submit_form', { name: 'tagged_deal', values: { title: 'Form deal', tags: [one.id, two.id] } });
+    const dealId = created.ids.id as string;
+    expect(names(await exec(admin, 'list_links', link({ id: dealId })))).toEqual(['f1', 'f2']);
+
+    await exec(admin, 'submit_form', { name: 'tagged_deal', recordId: dealId, values: { tags: [three.id] } });
+    expect(names(await exec(admin, 'list_links', link({ id: dealId })))).toEqual(['f3']);
+
+    const before = (await exec(admin, 'find_many_deals', { filter: { title: 'Rolled back' } })).total;
+    await expect(exec(admin, 'submit_form', { name: 'tagged_deal', values: { title: 'Rolled back', tags: ['00000000-0000-4000-8000-000000000000'] } })).rejects.toThrow(/do not exist/);
+    expect((await exec(admin, 'find_many_deals', { filter: { title: 'Rolled back' } })).total).toBe(before);
+    await expect(exec(admin, 'submit_form', { name: 'tagged_deal', values: { title: 'x', tags: 'not-a-list' } })).rejects.toThrow();
+  });
+
+  it('reads the links of many records at once, with labels', async () => {
+    const { admin, workspaceId, ids } = setup();
+    const [a, b, c] = await Promise.all(['Ba', 'Bb', 'Bc'].map((title) => exec(admin, 'create_one_deal', { data: { title } })));
+    const [x, y] = await Promise.all(['bx', 'by'].map((name) => exec(admin, 'create_one_tag', { data: { name } })));
+    await exec(admin, 'add_links', link({ id: a.id, targetIds: [x.id, y.id] }));
+    await exec(admin, 'add_links', link({ id: b.id, targetIds: [y.id] }));
+
+    const batch = await exec(admin, 'list_links_batch', { object: 'deals', field: 'tags', ids: [a.id, b.id, c.id] });
+    expect(batch.links[a.id].map((entry: { label: string }) => entry.label).sort()).toEqual(['bx', 'by']);
+    expect(batch.links[b.id].map((entry: { label: string }) => entry.label)).toEqual(['by']);
+    expect(batch.links[c.id]).toEqual([]);
+
+    const limited = await makeUser(workspaceId, `batch_${mode}`, async (roleId) => {
+      await setObjectPermission(databases.admin, roleId, ids.deals!, { read: true });
+      await setObjectPermission(databases.admin, roleId, ids.tags!, { read: true });
+      await addRowPredicate(databases.admin, roleId, ids.tags!, { fieldName: 'name', operator: 'eq', value: 'bx' });
+    });
+    const seen = await exec(limited, 'list_links_batch', { object: 'deals', field: 'tags', ids: [a.id, b.id] });
+    expect(seen.links[a.id].map((entry: { label: string }) => entry.label)).toEqual(['bx']);
+    expect(seen.links[b.id]).toEqual([]);
+  });
+
   it('enforces update rights, target read rights and target row rules', async () => {
     const { admin, workspaceId, ids } = setup();
     const deal = await exec(admin, 'create_one_deal', { data: { title: 'P' } });

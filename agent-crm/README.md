@@ -32,7 +32,14 @@ Scaffold for a multi-tenant, agent-first CRM platform. Every business object is 
 
 ## Web app
 
-Sign up and sign in (email verified over SMTP, Google optional), a workspace switcher, a data-model editor, a generic record table for every object (sort, filter, page, create, edit, delete, relations shown by name), a visual report builder (joins, aggregates, date buckets, filters, charts, live SQL preview, save and reopen), and settings for members and API keys, roles (capabilities, object matrix, field access, row rules), sign-in methods and the audit log.
+Sign up and sign in (email verified over SMTP, Google optional), invitation links, a workspace switcher, light and dark themes, and:
+
+- **Data model editor** for objects and fields, including relations and many-to-many.
+- **Record tables** for every object: sort, filter, page, create, edit, delete, relations shown by name, many-to-many shown as chips.
+- **Report builder**: joins, aggregates, date buckets, filters, charts, live SQL preview, save and reopen.
+- **Form designer and runner**: single, multiple (linked) and parent-child forms with a live preview, required and read-only fields, defaults, row limits, and edit mode for parent-child forms. Saved atomically, including many-to-many values.
+- **Grid designer and runner**: choose columns (including related fields), a built-in filter, sorting and page size, and row and bulk actions (set fields, delete, open a form, run a tool) with optional confirmation.
+- **Settings**: members and API keys, roles (capabilities, object matrix, field access, row rules), sign-in methods and the audit log.
 
 The browser talks to one origin: Next proxies `/api/auth/*` and `/v1/*` to the API server, so the Better Auth session cookie needs no CORS. Set the server's `APP_URL` to the web origin.
 
@@ -42,12 +49,12 @@ npm install
 set -a; . ./.env.example; set +a     # or copy to .env and adjust
 npm run dev:server                   # API on :3000
 npm run dev:web                      # web on :3001
-npm run smoke                        # drives the web app in a browser; needs the three above and the dev mail sink
+npm run smoke                        # two browser suites (core screens, then forms, grids, invitations); needs the three above and the dev mail sink
 ```
 
 `npm run dev:smtp` is a tiny mail sink that writes each email to `apps/server/.dev-mail/`; the smoke test reads verification links from there (use it instead of Mailpit when running the smoke test).
 
-Not in the UI yet: the form and data grid designers and their runtime pages (the backend and tools exist), many-to-many fields in tables and forms, dark mode, and workspace invitation acceptance pages.
+Not in the UI yet: reorderable layout sections and conditional fields in forms, grid-level user filters, dashboards that combine reports, and installable app bundles.
 
 ## Run
 

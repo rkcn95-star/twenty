@@ -103,6 +103,19 @@ describe('report builder', () => {
     expect(result.rows.map((row) => row.total)).toEqual([150, 30]);
   });
 
+  it('sorts empty values last in both directions', async () => {
+    const empty = await exec(admin, 'create_one_deal', { data: { title: 'no amount' } });
+    for (const direction of ['asc', 'desc']) {
+      const result = await exec<Rows>(admin, 'run_report', { definition: { source: 'deals', columns: [{ key: 'title', ref: { field: 'title' } }, { key: 'amount', ref: { field: 'amount' } }], orderBy: [{ key: 'amount', direction }] } });
+      const amounts = result.rows.map((row) => row.amount);
+      const firstEmpty = amounts.indexOf(null);
+      expect(firstEmpty).toBeGreaterThan(0);
+      expect(amounts.slice(firstEmpty).every((amount) => amount === null)).toBe(true);
+      expect(amounts.slice(0, firstEmpty).every((amount) => amount !== null)).toBe(true);
+    }
+    await exec(admin, 'delete_one_deal', { id: empty.id });
+  });
+
   it('reads back and deletes saved definitions', async () => {
     await exec(admin, 'save_report', { name: 'temp_report', definition: { source: 'deals', columns: [{ key: 'n', aggregate: 'count' }] } });
     const stored = await exec(admin, 'get_definition', { kind: 'report', name: 'temp_report' });

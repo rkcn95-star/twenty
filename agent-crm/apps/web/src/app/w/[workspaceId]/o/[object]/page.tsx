@@ -4,7 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type SortingState } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, MoreHorizontal, Plus, Table2, Trash2 } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { CellValue } from '@/components/records/cell-value';
 import { FilterPopover } from '@/components/records/filter-popover';
@@ -19,6 +19,7 @@ import { useObjectByPlural, useWorkspace } from '@/components/workspace-context'
 import { callTool } from '@/lib/api';
 import { singularLabel } from '@/lib/labels';
 import { buildTableReport, hasColumn, type TableFilter } from '@/lib/report';
+import { Badge } from '@/components/ui/badge';
 import type { ReportResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -57,7 +58,24 @@ export default function RecordsPage() {
     },
   });
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['records', workspaceId, plural] });
+  const linkFields = object?.fields.filter((field) => field.type === 'many_to_many') ?? [];
+  const rowIds = (data.data?.rows ?? []).map((row) => String(row.id));
+  const links = useQuery({
+    queryKey: ['record-links-batch', workspaceId, plural, rowIds.join(',')],
+    enabled: linkFields.length > 0 && rowIds.length > 0,
+    queryFn: async () => {
+      const entries = await Promise.all(
+        linkFields.map(async (field) => [field.name, (await callTool<{ links: Record<string, { id: string; label: string }[]> }>(workspaceId, 'list_links_batch', { object: plural, field: field.name, ids: rowIds })).links] as const),
+      );
+      return Object.fromEntries(entries);
+    },
+  });
+
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['record-links', workspaceId, plural] });
+    await queryClient.invalidateQueries({ queryKey: ['record-links-batch', workspaceId, plural] });
+    await queryClient.invalidateQueries({ queryKey: ['records', workspaceId, plural] });
+  };
   const remove = useMutation({
     mutationFn: async (ids: string[]) => {
       for (const id of ids) await callTool(workspaceId, `delete_one_${object!.nameSingular}`, { id });
@@ -69,6 +87,9 @@ export default function RecordsPage() {
     },
     onError: (error) => toast.error(error.message),
   });
+
+  const linksRef = useRef(links.data);
+  linksRef.current = links.data;
 
   const columns = useMemo<ColumnDef<RecordRow>[]>(() => {
     if (!object) return [];
@@ -89,13 +110,27 @@ export default function RecordsPage() {
           </div>
         ),
       },
-      ...object.fields.filter(hasColumn).map<ColumnDef<RecordRow>>((field) => ({
+      ...object.fields.map<ColumnDef<RecordRow>>((field) => field.type === 'many_to_many'
+        ? {
+            id: field.name,
+            header: field.label,
+            enableSorting: false,
+            accessorFn: (row) => row.id,
+            cell: ({ row }) => {
+              const entries = linksRef.current?.[field.name]?.[String(row.original.id)];
+              if (!entries) return <span className="text-muted-foreground/60">…</span>;
+              return entries.length === 0 ? <span className="text-muted-foreground/60">—</span> : (
+                <span className="flex gap-1">{entries.map((entry) => <Badge key={entry.id} variant="secondary" className="rounded-[4px] bg-blue-soft font-normal text-blue">{entry.label}</Badge>)}</span>
+              );
+            },
+          }
+        : {
         id: field.name,
         header: field.label,
         enableSorting: field.type !== 'json' && field.type !== 'multi_select',
         accessorFn: (row) => row[field.name],
         cell: ({ getValue }) => <CellValue type={field.type === 'relation' ? 'text' : field.type} value={getValue()} />,
-      })),
+      }),
       {
         id: 'created_at',
         header: 'Created',
@@ -121,7 +156,7 @@ export default function RecordsPage() {
         ),
       },
     ];
-  }, [object]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [object, links.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = data.data?.rows ?? [];
   const table = useReactTable({
@@ -214,7 +249,7 @@ export default function RecordsPage() {
         <span>{total === 0 ? '0 records' : `${from}–${to} of ${total}`}</span>
         <div className="flex items-center gap-1.5">
           <Select value={String(pageSize)} onValueChange={(value) => { setPageSize(Number(value)); setPage(0); }}>
-            <SelectTrigger size="sm" className="w-[84px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger size="sm" className="w-[100px]"><SelectValue /></SelectTrigger>
             <SelectContent>{PAGE_SIZES.map((size) => <SelectItem key={size} value={String(size)}>{size} rows</SelectItem>)}</SelectContent>
           </Select>
           <Button size="icon-sm" variant="ghost" aria-label="Previous page" disabled={page === 0} onClick={() => setPage((value) => value - 1)}><ChevronLeft /></Button>

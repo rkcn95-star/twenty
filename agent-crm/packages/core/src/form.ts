@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AppError } from './errors.js';
 import { IDENTIFIER_KEY } from './filters.js';
+import { editLinksWithin } from './link-ops.js';
 import * as records from './records.js';
 import type { RecordContext } from './records.js';
 import type { Metadata, ObjectDefinition } from './types.js';
@@ -74,7 +75,7 @@ const objectByName = (metadata: Metadata, plural: string): ObjectDefinition => {
 
 const assertFieldsExist = (object: ObjectDefinition, fields: FormField[]) => {
   for (const field of fields) {
-    if (!object.fields.some((candidate) => candidate.name === field.name && candidate.active && candidate.type !== 'many_to_many')) {
+    if (!object.fields.some((candidate) => candidate.name === field.name && candidate.active)) {
       throw new AppError('validation', `Object "${object.namePlural}" has no field "${field.name}"`);
     }
   }
@@ -145,15 +146,31 @@ const prepareValues = (fields: FormField[], values: Record<string, unknown> | un
 
 type ContextFor = (objectName: string) => RecordContext;
 
+// Many-to-many values are arrays of ids; they live in a link table, so they are saved after the record itself.
+const saveRecord = async (contextFor: ContextFor, objectPlural: string, id: string | undefined, values: Record<string, unknown>): Promise<records.RecordRow> => {
+  const context = contextFor(objectPlural);
+  const linkFields = new Set(context.object.fields.filter((field) => field.type === 'many_to_many').map((field) => field.name));
+  const recordValues = Object.fromEntries(Object.entries(values).filter(([name]) => !linkFields.has(name)));
+  const links = Object.entries(values).filter(([name, value]) => linkFields.has(name) && value !== undefined);
+
+  let row: records.RecordRow;
+  if (id) row = Object.keys(recordValues).length ? await records.updateOne(context, id, recordValues) : await records.findOne(context, id);
+  else row = await records.createOne(context, recordValues);
+  for (const [field, targetIds] of links) {
+    if (targetIds !== null && !Array.isArray(targetIds)) throw new AppError('validation', `"${field}" must be a list of record ids`);
+    await editLinksWithin(contextFor, 'set', { object: objectPlural, id: row.id as string, field, targetIds: (targetIds as string[] | null) ?? [] });
+  }
+  return row;
+};
+
 export const submitForm = async (
   definition: FormDefinition,
   submission: FormSubmission,
   contextFor: ContextFor,
 ): Promise<{ ids: Record<string, unknown> }> => {
   if (definition.kind === 'single') {
-    const ctx = contextFor(definition.object);
     const values = prepareValues(definition.fields, submission.values, !submission.recordId);
-    const row = submission.recordId ? await records.updateOne(ctx, submission.recordId, values) : await records.createOne(ctx, values);
+    const row = await saveRecord(contextFor, definition.object, submission.recordId, values);
     return { ids: { id: row.id } };
   }
 
@@ -163,18 +180,15 @@ export const submitForm = async (
     for (const section of definition.sections) {
       const values = prepareValues(section.fields, submission.sections?.[section.key], true);
       if (section.link) values[section.link.field] = ids[section.link.parent];
-      const row = await records.createOne(contextFor(section.object), values);
+      const row = await saveRecord(contextFor, section.object, undefined, values);
       ids[section.key] = row.id;
     }
     return { ids };
   }
 
-  const parentCtx = contextFor(definition.parent.object);
   const isCreate = !submission.recordId;
   const parentValues = prepareValues(definition.parent.fields, submission.parent, isCreate);
-  const parent = submission.recordId
-    ? await records.updateOne(parentCtx, submission.recordId, parentValues)
-    : await records.createOne(parentCtx, parentValues);
+  const parent = await saveRecord(contextFor, definition.parent.object, submission.recordId, parentValues);
   const parentId = parent.id as string;
 
   const childIds: Record<string, string[]> = {};
@@ -196,10 +210,10 @@ export const submitForm = async (
       if (row.id) {
         if (!existing.includes(row.id)) throw new AppError('validation', `Row ${row.id} does not belong to this record`);
         keep.add(row.id);
-        await records.updateOne(childCtx, row.id, values);
+        await saveRecord(contextFor, child.object, row.id, values);
         createdIds.push(row.id);
       } else {
-        const created = await records.createOne(childCtx, { ...values, [child.relationField]: parentId });
+        const created = await saveRecord(contextFor, child.object, undefined, { ...values, [child.relationField]: parentId });
         createdIds.push(created.id as string);
       }
     }

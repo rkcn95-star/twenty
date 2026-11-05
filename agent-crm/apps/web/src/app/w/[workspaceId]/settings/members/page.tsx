@@ -23,9 +23,9 @@ const KIND_LABELS = { user: 'Person', api_key: 'API key', agent: 'Agent' } as co
 const EXPIRY_OPTIONS = [{ value: 'never', label: 'Never expires' }, { value: '30', label: '30 days' }, { value: '90', label: '90 days' }, { value: '365', label: '1 year' }];
 
 const statusOf = (member: Member): { label: string; tone: string } => {
-  if (member.revokedAt) return { label: 'Revoked', tone: 'bg-red-50 text-destructive' };
-  if (member.expiresAt && new Date(member.expiresAt) < new Date()) return { label: 'Expired', tone: 'bg-orange-50 text-orange-700' };
-  return { label: 'Active', tone: 'bg-green-50 text-green-700' };
+  if (member.revokedAt) return { label: 'Revoked', tone: 'bg-red-50 text-destructive dark:bg-red-950' };
+  if (member.expiresAt && new Date(member.expiresAt) < new Date()) return { label: 'Expired', tone: 'bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300' };
+  return { label: 'Active', tone: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400' };
 };
 
 function RoleChecklist({ roles, selected, onChange }: { roles: Role[]; selected: string[]; onChange: (ids: string[]) => void }) {
