@@ -1,0 +1,17 @@
+{
+  "name": "@agent-crm/server",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent-crm/core": "*",
+    "@hono/node-server": "^1.13.7",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "hono": "^4.6.14",
+    "zod": "^4.0.0"
+  }
+}

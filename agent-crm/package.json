@@ -1,0 +1,23 @@
+{
+  "name": "agent-crm",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "tsc -b packages/core apps/server",
+    "typecheck": "tsc -b packages/core apps/server --noEmit false",
+    "test": "npm run test -w @agent-crm/core && npm run test -w @agent-crm/server",
+    "dev": "npm run dev -w @agent-crm/server",
+    "migrate": "npm run migrate -w @agent-crm/core"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
