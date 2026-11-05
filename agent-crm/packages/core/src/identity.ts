@@ -72,7 +72,7 @@ export const createWorkspaceForUser = async (
   input: { name: string; authUserId: string; userName: string; email: string },
 ): Promise<{ workspaceId: string; principal: Principal; tenancy: Tenancy }> => {
   const workspace = await provisionWorkspace(admin, input.name);
-  const roleId = await createRole(admin, workspace.id, { name: 'admin', canManageSchema: true, allObjectsAccess: true, canBypassAuth: true });
+  const roleId = await createRole(admin, workspace.id, { name: 'admin', canManageSchema: true, canManageAccess: true, allObjectsAccess: true, canBypassAuth: true });
   const principal = await createUserPrincipal(admin, workspace.id, {
     authUserId: input.authUserId, name: input.userName, email: input.email, roleIds: [roleId],
   });

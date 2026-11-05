@@ -8,6 +8,7 @@ export type PredicateGroups = Predicate[][] | null;
 
 export type PermissionSet = {
   canManageSchema: boolean;
+  canManageAccess: boolean;
   objects: Map<string, ObjectAccess>;
   hiddenFieldIds: Set<string>;
   readOnlyFieldIds: Set<string>;
@@ -17,6 +18,7 @@ export type PermissionSet = {
 type RoleGrants = {
   id: string;
   canManageSchema: boolean;
+  canManageAccess: boolean;
   allObjectsAccess: boolean;
   objects: Map<string, ObjectAccess>;
   fields: Map<string, { read: boolean; write: boolean }>;
@@ -29,7 +31,7 @@ const FULL_ACCESS: ObjectAccess = { read: true, create: true, update: true, dele
 const loadRoleGrants = async (admin: pg.Pool, principalId: string): Promise<RoleGrants[]> => {
   const roles = (
     await admin.query(
-      `SELECT r.id, r.can_manage_schema, r.all_objects_access FROM core.roles r
+      `SELECT r.id, r.can_manage_schema, r.can_manage_access, r.all_objects_access FROM core.roles r
        JOIN core.role_assignments ra ON ra.role_id = r.id WHERE ra.principal_id = $1`,
       [principalId],
     )
@@ -44,6 +46,7 @@ const loadRoleGrants = async (admin: pg.Pool, principalId: string): Promise<Role
     const grants: RoleGrants = {
       id: role.id,
       canManageSchema: role.can_manage_schema,
+      canManageAccess: role.can_manage_access,
       allObjectsAccess: role.all_objects_access,
       objects: new Map(),
       fields: new Map(),
@@ -70,6 +73,7 @@ const accessOf = (role: RoleGrants, objectId: string): ObjectAccess =>
 const unionOfRoles = (roles: RoleGrants[], metadata: Metadata): PermissionSet => {
   const set: PermissionSet = {
     canManageSchema: roles.some((role) => role.canManageSchema),
+    canManageAccess: roles.some((role) => role.canManageAccess),
     objects: new Map(),
     hiddenFieldIds: new Set(),
     readOnlyFieldIds: new Set(),
@@ -120,6 +124,7 @@ const intersect = (first: PermissionSet, second: PermissionSet): PermissionSet =
   }
   return {
     canManageSchema: first.canManageSchema && second.canManageSchema,
+    canManageAccess: first.canManageAccess && second.canManageAccess,
     objects,
     hiddenFieldIds: new Set([...first.hiddenFieldIds, ...second.hiddenFieldIds]),
     readOnlyFieldIds: new Set([...first.readOnlyFieldIds, ...second.readOnlyFieldIds]),

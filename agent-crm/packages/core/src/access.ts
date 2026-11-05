@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type pg from 'pg';
+import { keepingAnAdmin } from './admin-guard.js';
+import { inTransaction } from './db.js';
 import { AppError } from './errors.js';
 import type { Principal } from './types.js';
 
@@ -8,11 +10,11 @@ const hashKey = (key: string): string => createHash('sha256').update(key).digest
 export const createRole = async (
   admin: pg.Pool,
   workspaceId: string,
-  input: { name: string; canManageSchema?: boolean; allObjectsAccess?: boolean; canBypassAuth?: boolean },
+  input: { name: string; canManageSchema?: boolean; canManageAccess?: boolean; allObjectsAccess?: boolean; canBypassAuth?: boolean },
 ): Promise<string> => {
   const result = await admin.query(
-    'INSERT INTO core.roles (workspace_id, name, can_manage_schema, all_objects_access, can_bypass_auth) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-    [workspaceId, input.name, input.canManageSchema ?? false, input.allObjectsAccess ?? false, input.canBypassAuth ?? false],
+    'INSERT INTO core.roles (workspace_id, name, can_manage_schema, can_manage_access, all_objects_access, can_bypass_auth) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+    [workspaceId, input.name, input.canManageSchema ?? false, input.canManageAccess ?? false, input.allObjectsAccess ?? false, input.canBypassAuth ?? false],
   );
   return result.rows[0].id;
 };
@@ -91,21 +93,24 @@ export const addRowPredicate = (
     JSON.stringify(predicate.value ?? null),
   ]);
 
-export const revokeKey = async (admin: pg.Pool, workspaceId: string, principalId: string) => {
-  const result = await admin.query('UPDATE core.principals SET revoked_at = now() WHERE id = $1 AND workspace_id = $2 AND key_hash IS NOT NULL', [
-    principalId,
-    workspaceId,
-  ]);
-  if (result.rowCount === 0) throw new AppError('not_found', 'Key not found');
-};
+export const revokeKey = (admin: pg.Pool, workspaceId: string, principalId: string) =>
+  inTransaction(admin, async (client) => {
+    const result = await keepingAnAdmin(client, workspaceId, () =>
+      client.query('UPDATE core.principals SET revoked_at = now() WHERE id = $1 AND workspace_id = $2 AND key_hash IS NOT NULL', [principalId, workspaceId]),
+    );
+    if (result.rowCount === 0) throw new AppError('not_found', 'Key not found');
+  });
 
 // Replaces the key and clears any revocation; the old key stops working immediately.
-export const rotateKey = async (admin: pg.Pool, workspaceId: string, principalId: string, expiresAt?: Date): Promise<string> => {
-  const apiKey = `ak_${randomBytes(24).toString('base64url')}`;
-  const result = await admin.query(
-    'UPDATE core.principals SET key_hash = $3, revoked_at = NULL, expires_at = $4 WHERE id = $1 AND workspace_id = $2 AND key_hash IS NOT NULL',
-    [principalId, workspaceId, hashKey(apiKey), expiresAt ?? null],
-  );
-  if (result.rowCount === 0) throw new AppError('not_found', 'Key not found');
-  return apiKey;
-};
+export const rotateKey = (admin: pg.Pool, workspaceId: string, principalId: string, expiresAt?: Date): Promise<string> =>
+  inTransaction(admin, async (client) => {
+    const apiKey = `ak_${randomBytes(24).toString('base64url')}`;
+    const result = await keepingAnAdmin(client, workspaceId, () =>
+      client.query(
+        'UPDATE core.principals SET key_hash = $3, revoked_at = NULL, expires_at = $4 WHERE id = $1 AND workspace_id = $2 AND key_hash IS NOT NULL',
+        [principalId, workspaceId, hashKey(apiKey), expiresAt ?? null],
+      ),
+    );
+    if (result.rowCount === 0) throw new AppError('not_found', 'Key not found');
+    return apiKey;
+  });

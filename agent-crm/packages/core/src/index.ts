@@ -14,3 +14,5 @@ export * from './grid.js';
 export * from './report.js';
 export * from './links.js';
 export * from './identity.js';
+export * from './management.js';
+export * from './access-tools.js';

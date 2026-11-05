@@ -6,6 +6,7 @@ import {
   type CreateFieldInput, type CreateObjectInput, type Databases, type ErrorCode,
 } from '@agent-crm/core';
 import type { Auth, AuthMethod, Mail } from './auth.js';
+import { mountManagementRoutes } from './management-routes.js';
 import { buildMcpServer, type McpMode } from './mcp.js';
 
 const STATUS: Record<ErrorCode, 400 | 403 | 404 | 409> = { validation: 400, forbidden: 403, not_found: 404, conflict: 409 };
@@ -54,7 +55,7 @@ export const createApp = (databases: Databases, adminToken: string, options: App
     requireOperator(c);
     const { workspaceName, dataModelId } = await c.req.json<{ workspaceName: string; dataModelId?: string }>();
     const workspace = await provisionWorkspace(databases.admin, workspaceName, { dataModelId });
-    const roleId = await createRole(databases.admin, workspace.id, { name: 'admin', canManageSchema: true, allObjectsAccess: true });
+    const roleId = await createRole(databases.admin, workspace.id, { name: 'admin', canManageSchema: true, canManageAccess: true, allObjectsAccess: true });
     const { apiKey } = await createPrincipal(databases.admin, workspace.id, { kind: 'api_key', name: 'bootstrap key', roleIds: [roleId] });
     return c.json({ workspaceId: workspace.id, dataModelId: workspace.dataModelId, tenancy: workspace.tenancy, apiKey }, 201);
   });
@@ -86,11 +87,13 @@ export const createApp = (databases: Databases, adminToken: string, options: App
 
   const requireWorkspaceAdmin = async (c: HeaderContext, workspaceId: string) => {
     const session = await requireSession(c);
-    if (session.principal.workspaceId !== workspaceId || !session.permissions.canManageSchema) {
+    if (session.principal.workspaceId !== workspaceId || !session.permissions.canManageAccess) {
       throw new AppError('forbidden', 'Workspace admin access is required');
     }
     return session;
   };
+
+  mountManagementRoutes(app, databases, requireSession);
 
   if (options.auth) {
     const auth = options.auth;

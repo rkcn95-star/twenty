@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { builderTools } from './builder-tools.js';
+import { accessTools } from './access-tools.js';
 import { linkTools } from './links.js';
 import { createField, createObject } from './schema-runner.js';
 import { FIELD_TYPES } from './types.js';
@@ -15,7 +16,7 @@ export type ToolAnnotations = { readOnlyHint: boolean; destructiveHint: boolean;
 export type ToolDefinition = {
   name: string;
   description: string;
-  category: 'data' | 'schema' | 'builder';
+  category: 'data' | 'schema' | 'builder' | 'access';
   inputSchema: z.ZodType;
   annotations: ToolAnnotations;
   run: (args: any) => Promise<unknown>;
@@ -139,4 +140,5 @@ export const buildTools = (env: ToolEnvironment): ToolDefinition[] => [
   ...linkTools(env),
   ...schemaTools(env),
   ...builderTools(env),
+  ...accessTools(env),
 ];
