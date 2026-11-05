@@ -23,8 +23,12 @@ export type ObjectDefinition = {
   fields: FieldDefinition[];
 };
 
+export type Tenancy = 'isolated' | 'shared';
+
 export type Metadata = {
   workspaceId: string;
+  dataModelId: string;
+  tenancy: Tenancy;
   schemaName: string;
   version: number;
   objects: ObjectDefinition[];

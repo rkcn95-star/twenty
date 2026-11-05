@@ -7,6 +7,7 @@ import { resetDatabase } from './helpers.js';
 
 let databases: Databases;
 let workspaceId: string;
+let dataModelId: string;
 let admin: Session;
 let ids: Record<string, string> = {};
 let fieldIds: Record<string, string> = {};
@@ -16,10 +17,10 @@ type Rows = { rows: Record<string, unknown>[]; sql: string };
 const exec = <TResult = any>(session: Session, tool: string, args: unknown) => session.execute(tool, args) as Promise<TResult>;
 
 const addObject = async (singular: string, plural: string, fields: [string, FieldType, object?][]) => {
-  const object = await createObject(databases.admin, workspaceId, { nameSingular: singular, namePlural: plural, label: singular });
+  const object = await createObject(databases.admin, dataModelId, { nameSingular: singular, namePlural: plural, label: singular });
   ids[plural] = object.id;
   for (const [name, type, extra] of fields) {
-    const field = await createField(databases.admin, workspaceId, object.id, { name, label: name, type, ...(extra ?? {}) });
+    const field = await createField(databases.admin, dataModelId, object.id, { name, label: name, type, ...(extra ?? {}) });
     fieldIds[`${plural}.${name}`] = field.id;
   }
 };
@@ -33,7 +34,9 @@ const makeUser = async (roleName: string, setup: (roleId: string) => Promise<voi
 
 beforeAll(async () => {
   databases = await resetDatabase();
-  workspaceId = (await provisionWorkspace(databases.admin, 'builders')).id;
+  const workspace = await provisionWorkspace(databases.admin, 'builders');
+  workspaceId = workspace.id;
+  dataModelId = workspace.dataModelId;
   const adminRole = await createRole(databases.admin, workspaceId, { name: 'admin', canManageSchema: true, allObjectsAccess: true });
   const { principal } = await createPrincipal(databases.admin, workspaceId, { kind: 'api_key', name: 'admin', roleIds: [adminRole] });
 

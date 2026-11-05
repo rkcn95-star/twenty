@@ -22,5 +22,5 @@ export const assertUuid = (value: string): string => {
 
 export const quoteIdent = (name: string): string => `"${name.replaceAll('"', '""')}"`;
 
-export const workspaceSchemaName = (workspaceId: string): string =>
-  `ws_${assertUuid(workspaceId).replaceAll('-', '')}`;
+export const dataModelSchemaName = (dataModelId: string, tenancy: 'isolated' | 'shared'): string =>
+  `${tenancy === 'shared' ? 'shared' : 'ws'}_${assertUuid(dataModelId).replaceAll('-', '')}`;

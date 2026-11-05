@@ -21,10 +21,10 @@ export const seedWorkspace = async (databases: Databases, name: string) => {
   const workspace = await provisionWorkspace(databases.admin, name);
   const adminRole = await createRole(databases.admin, workspace.id, { name: 'admin', canManageSchema: true, allObjectsAccess: true });
   const admin = await createPrincipal(databases.admin, workspace.id, { kind: 'api_key', name: 'admin key', roleIds: [adminRole] });
-  const deals = await createObject(databases.admin, workspace.id, { nameSingular: 'deal', namePlural: 'deals', label: 'Deal' });
-  const title = await createField(databases.admin, workspace.id, deals.id, { name: 'title', label: 'Title', type: 'text' });
-  const secret = await createField(databases.admin, workspace.id, deals.id, { name: 'secret', label: 'Secret', type: 'text' });
-  const stage = await createField(databases.admin, workspace.id, deals.id, {
+  const deals = await createObject(databases.admin, workspace.dataModelId, { nameSingular: 'deal', namePlural: 'deals', label: 'Deal' });
+  const title = await createField(databases.admin, workspace.dataModelId, deals.id, { name: 'title', label: 'Title', type: 'text' });
+  const secret = await createField(databases.admin, workspace.dataModelId, deals.id, { name: 'secret', label: 'Secret', type: 'text' });
+  const stage = await createField(databases.admin, workspace.dataModelId, deals.id, {
     name: 'stage', label: 'Stage', type: 'select', options: ['new', 'won', 'lost'],
   });
   return { workspace, adminRole, admin, deals, fields: { title, secret, stage } };

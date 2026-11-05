@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
-  AppError, Session, authenticate, createPrincipal, createRole, provisionWorkspace, type Databases, type ErrorCode,
+  AppError, Session, authenticate, createDataModel, createField, createObject, createPrincipal, createRole, provisionWorkspace,
+  type CreateFieldInput, type CreateObjectInput, type Databases, type ErrorCode,
 } from '@agent-crm/core';
 import { buildMcpServer, type McpMode } from './mcp.js';
 
@@ -20,13 +21,34 @@ export const createApp = (databases: Databases, adminToken: string) => {
 
   app.get('/health', (c) => c.json({ ok: true }));
 
-  app.post('/v1/bootstrap', async (c) => {
+  const requireOperator = (c: { req: { header: (name: string) => string | undefined } }) => {
     if (c.req.header('x-admin-token') !== adminToken) throw new AppError('forbidden', 'Invalid admin token');
-    const { workspaceName } = await c.req.json<{ workspaceName: string }>();
-    const workspace = await provisionWorkspace(databases.admin, workspaceName);
+  };
+
+  // Shared data models are changed by the platform operator only; tenants never get schema tools on them.
+  app.post('/v1/data-models', async (c) => {
+    requireOperator(c);
+    const { name } = await c.req.json<{ name: string }>();
+    return c.json(await createDataModel(databases.admin, name, 'shared'), 201);
+  });
+
+  app.post('/v1/data-models/:id/objects', async (c) => {
+    requireOperator(c);
+    return c.json(await createObject(databases.admin, c.req.param('id'), await c.req.json<CreateObjectInput>()), 201);
+  });
+
+  app.post('/v1/data-models/:id/objects/:objectId/fields', async (c) => {
+    requireOperator(c);
+    return c.json(await createField(databases.admin, c.req.param('id'), c.req.param('objectId'), await c.req.json<CreateFieldInput>()), 201);
+  });
+
+  app.post('/v1/bootstrap', async (c) => {
+    requireOperator(c);
+    const { workspaceName, dataModelId } = await c.req.json<{ workspaceName: string; dataModelId?: string }>();
+    const workspace = await provisionWorkspace(databases.admin, workspaceName, { dataModelId });
     const roleId = await createRole(databases.admin, workspace.id, { name: 'admin', canManageSchema: true, allObjectsAccess: true });
     const { apiKey } = await createPrincipal(databases.admin, workspace.id, { kind: 'api_key', name: 'bootstrap key', roleIds: [roleId] });
-    return c.json({ workspaceId: workspace.id, apiKey }, 201);
+    return c.json({ workspaceId: workspace.id, dataModelId: workspace.dataModelId, tenancy: workspace.tenancy, apiKey }, 201);
   });
 
   const requireSession = async (c: { req: { header: (name: string) => string | undefined } }) => {

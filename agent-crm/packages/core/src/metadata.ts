@@ -6,8 +6,9 @@ const cache = new Map<string, Metadata>();
 
 export const loadMetadata = async (admin: pg.Pool, workspaceId: string): Promise<Metadata> => {
   const versionResult = await admin.query(
-    `SELECT w.schema_name, v.version FROM core.workspaces w
-     JOIN core.metadata_version v ON v.workspace_id = w.id WHERE w.id = $1`,
+    `SELECT m.id AS data_model_id, m.tenancy, m.schema_name, v.version FROM core.workspaces w
+     JOIN core.data_models m ON m.id = w.data_model_id
+     JOIN core.metadata_version v ON v.data_model_id = m.id WHERE w.id = $1`,
     [workspaceId],
   );
   const header = versionResult.rows[0];
@@ -17,8 +18,8 @@ export const loadMetadata = async (admin: pg.Pool, workspaceId: string): Promise
   if (cached && cached.version === version) return cached;
 
   const [objectRows, fieldRows] = await Promise.all([
-    admin.query('SELECT * FROM core.object_definitions WHERE workspace_id = $1 ORDER BY created_at', [workspaceId]),
-    admin.query('SELECT * FROM core.field_definitions WHERE workspace_id = $1 ORDER BY name', [workspaceId]),
+    admin.query('SELECT * FROM core.object_definitions WHERE data_model_id = $1 ORDER BY created_at', [header.data_model_id]),
+    admin.query('SELECT * FROM core.field_definitions WHERE data_model_id = $1 ORDER BY name', [header.data_model_id]),
   ]);
   const fieldsByObject = new Map<string, FieldDefinition[]>();
   for (const row of fieldRows.rows) {
@@ -41,7 +42,14 @@ export const loadMetadata = async (admin: pg.Pool, workspaceId: string): Promise
     label: row.label,
     fields: fieldsByObject.get(row.id) ?? [],
   }));
-  const metadata: Metadata = { workspaceId, schemaName: header.schema_name, version, objects };
+  const metadata: Metadata = {
+    workspaceId,
+    dataModelId: header.data_model_id,
+    tenancy: header.tenancy,
+    schemaName: header.schema_name,
+    version,
+    objects,
+  };
   cache.set(workspaceId, metadata);
   return metadata;
 };

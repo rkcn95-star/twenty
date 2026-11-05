@@ -136,7 +136,7 @@ describe('schema runner and validation', () => {
 
   it('exposes new objects and fields as tools after a metadata change, with a relation', async () => {
     const created = (await (await adminSession(a)).execute('create_object', { nameSingular: 'task', namePlural: 'tasks', label: 'Task' })) as { id: string };
-    await createField(databases.admin, a.workspace.id, created.id, { name: 'deal', label: 'Deal', type: 'relation', relationObjectId: a.deals.id });
+    await createField(databases.admin, a.workspace.dataModelId, created.id, { name: 'deal', label: 'Deal', type: 'relation', relationObjectId: a.deals.id });
     const session = await adminSession(a);
     expect(session.toolNames()).toContain('create_one_task');
     const deal = (await session.execute('create_one_deal', { data: { title: 'Linked' } })) as { id: string };

@@ -34,10 +34,25 @@ export const applySessionSettings = async (client: pg.PoolClient, workspaceId: s
   for (const [name, value] of settings) await client.query('SELECT set_config($1, $2, true)', [name, value]);
 };
 
+const FOREIGN_KEY_VIOLATION = '23503';
+
+const guardForeignKeys = async <TResult>(work: Promise<TResult>): Promise<TResult> => {
+  try {
+    return await work;
+  } catch (error) {
+    if ((error as { code?: string }).code === FOREIGN_KEY_VIOLATION) {
+      throw new AppError('validation', 'A referenced record does not exist');
+    }
+    throw error;
+  }
+};
+
 const withRls = <TResult>(ctx: RecordContext, work: (client: pg.PoolClient) => Promise<TResult>) =>
-  ctx.client
-    ? work(ctx.client)
-    : inTransaction(ctx.runtime, work, (client) => applySessionSettings(client, ctx.metadata.workspaceId, ctx.permissions));
+  guardForeignKeys(
+    ctx.client
+      ? work(ctx.client)
+      : inTransaction(ctx.runtime, work, (client) => applySessionSettings(client, ctx.metadata.workspaceId, ctx.permissions)),
+  );
 
 const tableOf = (ctx: RecordContext) => `${quoteIdent(ctx.metadata.schemaName)}.${quoteIdent(ctx.object.namePlural)}`;
 
@@ -147,8 +162,9 @@ export const createOne = async (ctx: RecordContext, data: Record<string, unknown
   requireAccess(ctx, 'create');
   const input = inputSchemaFor(ctx).parse(data);
   const fields = writableFields(ctx).filter((field) => input[field.name] !== undefined);
-  const columns = ['created_by', ...fields.map((field) => columnNameOf(field))].map(quoteIdent);
-  const values = [ctx.principal.id, ...fields.map((field) => toJsonValue(field, input[field.name]))];
+  const tenantColumns = ctx.metadata.tenancy === 'shared' ? [['workspace_id', ctx.metadata.workspaceId]] : [];
+  const columns = ['created_by', ...tenantColumns.map(([name]) => name), ...fields.map((field) => columnNameOf(field))].map((name) => quoteIdent(name as string));
+  const values = [ctx.principal.id, ...tenantColumns.map(([, value]) => value), ...fields.map((field) => toJsonValue(field, input[field.name]))];
   const placeholders = values.map((_, index) => `$${index + 1}`);
 
   return withRls(ctx, async (client) => {

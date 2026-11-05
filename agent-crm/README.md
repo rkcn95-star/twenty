@@ -9,8 +9,11 @@ Scaffold for a multi-tenant, agent-first CRM platform. Every business object is 
 
 ## How it works
 
-- **Tenancy.** One Postgres schema per workspace (`ws_<uuid>`). Metadata and access config live in `core`.
-- **Objects.** `create_object` / `create_field` run DDL and metadata inserts in one transaction: one table per object, one column per field. Select fields use `text` plus a `CHECK`; relations are `<name>_id uuid` foreign keys.
+- **Tenancy.** A data model owns the objects, fields and the physical schema; each workspace points at one. Two modes:
+  - `isolated`: a schema per customer (`ws_<uuid>`), one table per object. The customer's admins can create objects and fields. Use for payroll, finance and regulated customers.
+  - `shared`: one schema (`shared_<uuid>`) for many workspaces. Every table has `workspace_id`, and RLS filters on it. Relations use composite foreign keys `(workspace_id, id)` because foreign keys skip RLS. Only the platform operator changes the model; tenants get no schema tools, but keep their own roles, forms, grids and reports.
+  - Metadata and access config live in `core`.
+- **Objects.** `create_object` (isolated models)  / `create_field` run DDL and metadata inserts in one transaction: one table per object, one column per field. Select fields use `text` plus a `CHECK`; relations are `<name>_id uuid` foreign keys.
 - **RLS.** Every generated table has `FORCE ROW LEVEL SECURITY` and four policies for the `app_runtime` role. The workspace id and object id are baked into the policy; the request sets `app.workspace_id`, `app.read_objects` and `app.write_objects` with transaction-local `set_config`.
 - **Roles.** Object CRUD flags, field hidden/read-only flags, and row predicates (`created_by eq $principal`). Create, update and delete are checked in the service; RLS enforces read vs write per object.
 - **Agents.** An agent acting for a user (`x-on-behalf-of` header) gets the intersection of both permission sets.
@@ -33,11 +36,21 @@ set -a; . ./.env; set +a
 npm run dev
 ```
 
-Create a workspace and first admin key:
+Create a workspace with its own schema, and its first admin key:
 
 ```bash
 curl -X POST localhost:3000/v1/bootstrap -H "x-admin-token: $ADMIN_TOKEN" \
   -H 'content-type: application/json' -d '{"workspaceName":"Acme"}'
+```
+
+Shared mode (operator token required):
+
+```bash
+curl -X POST localhost:3000/v1/data-models -H "x-admin-token: $ADMIN_TOKEN" -H 'content-type: application/json' -d '{"name":"invoicing"}'
+curl -X POST localhost:3000/v1/data-models/<modelId>/objects -H "x-admin-token: $ADMIN_TOKEN" -H 'content-type: application/json' \
+  -d '{"nameSingular":"invoice","namePlural":"invoices","label":"Invoice"}'
+curl -X POST localhost:3000/v1/bootstrap -H "x-admin-token: $ADMIN_TOKEN" -H 'content-type: application/json' \
+  -d '{"workspaceName":"Acme","dataModelId":"<modelId>"}'
 ```
 
 ## Not built yet
@@ -48,4 +61,5 @@ curl -X POST localhost:3000/v1/bootstrap -H "x-admin-token: $ADMIN_TOKEN" \
 - `search` field type, many-to-many relations, field rename and type change, keyset pagination.
 - Approvals for destructive tools, OAuth 2.1 on the MCP endpoint, rate limits, billing.
 - Web app.
+- Shared mode: unique indexes must include `workspace_id` (none are generated yet), tenant export, and moving a tenant between modes.
 - `app_runtime` ships with a default password in `001_core.sql`; change it before any deployment.

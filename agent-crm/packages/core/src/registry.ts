@@ -102,9 +102,10 @@ const objectTools = (env: ToolEnvironment, object: ObjectDefinition): ToolDefini
 };
 
 const schemaTools = (env: ToolEnvironment): ToolDefinition[] => {
-  if (!env.permissions.canManageSchema) return [];
+  // A shared model serves many tenants, so only the platform operator changes it, never a tenant admin.
+  if (!env.permissions.canManageSchema || env.metadata.tenancy !== 'isolated') return [];
   const admin = env.databases.admin;
-  const workspaceId = env.principal.workspaceId;
+  const dataModelId = env.metadata.dataModelId;
   return [
     {
       name: 'create_object',
@@ -112,7 +113,7 @@ const schemaTools = (env: ToolEnvironment): ToolDefinition[] => {
       category: 'schema',
       annotations: WRITE,
       inputSchema: z.object({ nameSingular: z.string(), namePlural: z.string(), label: z.string() }),
-      run: (args) => createObject(admin, workspaceId, args),
+      run: (args) => createObject(admin, dataModelId, args),
     },
     {
       name: 'create_field',
@@ -127,7 +128,7 @@ const schemaTools = (env: ToolEnvironment): ToolDefinition[] => {
         options: z.array(z.string()).optional(),
         relationObjectId: z.uuid().optional(),
       }),
-      run: ({ objectId, ...input }) => createField(admin, workspaceId, objectId, input),
+      run: ({ objectId, ...input }) => createField(admin, dataModelId, objectId, input),
     },
   ];
 };
