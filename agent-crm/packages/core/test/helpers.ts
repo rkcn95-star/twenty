@@ -10,7 +10,7 @@ export const databaseUrls = () => ({
 
 export const resetDatabase = async (): Promise<Databases> => {
   const databases = connect(databaseUrls());
-  const schemas = await databases.admin.query("SELECT nspname FROM pg_namespace WHERE nspname = 'core' OR nspname LIKE 'ws\\_%'");
+  const schemas = await databases.admin.query("SELECT nspname FROM pg_namespace WHERE nspname = 'core' OR nspname ~ '^(ws|shared)_'");
   for (const { nspname } of schemas.rows) await databases.admin.query(`DROP SCHEMA "${nspname}" CASCADE`);
   await databases.admin.query('DROP TABLE IF EXISTS public.schema_migrations');
   await migrate(databases.admin);
