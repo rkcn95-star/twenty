@@ -1,9 +1,12 @@
+import type pg from 'pg';
 import { z } from 'zod';
 import { loadPrincipal } from './access.js';
-import type { Databases } from './db.js';
+import { inTransaction, type Databases } from './db.js';
 import { AppError } from './errors.js';
 import { loadMetadata } from './metadata.js';
 import { resolvePermissions, type PermissionSet } from './permissions.js';
+import { applySessionSettings, type RecordContext } from './records.js';
+import type { ReportView } from './report.js';
 import { buildTools, type ToolDefinition, type ToolEnvironment } from './registry.js';
 import type { Metadata, Principal } from './types.js';
 
@@ -32,7 +35,7 @@ export class Session {
     readonly metadata: Metadata,
     readonly permissions: PermissionSet,
   ) {
-    const env: ToolEnvironment = { databases, principal, metadata, permissions };
+    const env: ToolEnvironment = { databases, principal, metadata, permissions, session: this };
     this.tools = new Map(buildTools(env).map((tool) => [tool.name, tool]));
   }
 
@@ -42,6 +45,36 @@ export class Session {
     if (onBehalfOf && onBehalfOf.workspaceId !== principal.workspaceId) throw new AppError('forbidden', 'Cross-workspace delegation');
     const permissions = await resolvePermissions(databases.admin, principal, metadata, onBehalfOf);
     return new Session(databases, principal, metadata, permissions);
+  }
+
+  get reportView(): ReportView {
+    return { metadata: this.metadata, permissions: this.permissions, principal: this.principal };
+  }
+
+  get runtime(): pg.Pool {
+    return this.databases.runtime;
+  }
+
+  recordContext(objectPlural: string, client?: pg.PoolClient): RecordContext {
+    const object = this.metadata.objects.find((candidate) => candidate.namePlural === objectPlural);
+    if (!object) throw new AppError('not_found', `Unknown object "${objectPlural}"`);
+    return {
+      runtime: this.databases.runtime,
+      metadata: this.metadata,
+      object,
+      permissions: this.permissions,
+      principal: this.principal,
+      client,
+    };
+  }
+
+  // One RLS transaction shared by every record operation inside `work`; any error rolls all of them back.
+  withTransaction<TResult>(work: (contextFor: (objectPlural: string) => RecordContext) => Promise<TResult>): Promise<TResult> {
+    return inTransaction(
+      this.databases.runtime,
+      (client) => work((objectPlural) => this.recordContext(objectPlural, client)),
+      (client) => applySessionSettings(client, this.metadata.workspaceId, this.permissions),
+    );
   }
 
   toolNames(): string[] {

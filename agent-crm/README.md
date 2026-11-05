@@ -15,6 +15,11 @@ Scaffold for a multi-tenant, agent-first CRM platform. Every business object is 
 - **Roles.** Object CRUD flags, field hidden/read-only flags, and row predicates (`created_by eq $principal`). Create, update and delete are checked in the service; RLS enforces read vs write per object.
 - **Agents.** An agent acting for a user (`x-on-behalf-of` header) gets the intersection of both permission sets.
 - **Tools.** Per object: `find_many_<plural>`, `find_one_<singular>`, `create_one_`, `update_one_`, `delete_one_`. Schema tools need the schema permission. All calls go through `Session.execute`, which validates, authorizes and audits.
+- **Builders.** Forms, grids and reports are JSON definitions in `core.definitions`, validated with zod, saved by principals with the schema permission, and run with the caller's own permissions.
+  - *Report builder:* `report.ts` compiles a definition (source object, relation joins, columns, aggregates, date buckets, nested filters, sort) to parameterised SQL. Identifiers come from metadata only, row rules and field masks apply per joined table, and it runs read-only with a 5 second timeout. `preview_report_sql` shows the SQL.
+  - *Forms:* `single`, `multi` (linked records) and `parent_child` (header plus repeating rows, with edit that creates, updates and deletes rows). One RLS transaction, so any failure rolls everything back.
+  - *Data grids:* compiled through the report engine. Actions: `set_fields`, `delete` (atomic), `run_tool`, and `open_form` (client side).
+  - Tools: `save_form|grid|report`, `list_definitions`, `describe_form`, `submit_form`, `run_grid`, `run_grid_action`, `run_report`, `preview_report_sql`.
 - **MCP.** `POST /mcp` with a bearer API key. Default mode exposes `get_tool_catalog`, `learn_tools`, `execute_tool`, `list_object_metadata`, `load_skill`. `/mcp?mode=direct` lists every permitted tool.
 
 ## Run
@@ -37,6 +42,8 @@ curl -X POST localhost:3000/v1/bootstrap -H "x-admin-token: $ADMIN_TOKEN" \
 
 ## Not built yet
 
+- The visual builders and runtime renderers (the UI that produces and consumes these definitions).
+- Conditional form logic, computed fields, reverse (one-to-many) joins in reports, raw SQL mode, dashboards, installable app bundles.
 - Auth for human users (sessions, SSO), invites, an API for managing roles and predicates (use `core/src/access.ts` for now).
 - `search` field type, many-to-many relations, field rename and type change, keyset pagination.
 - Approvals for destructive tools, OAuth 2.1 on the MCP endpoint, rate limits, billing.

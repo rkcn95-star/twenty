@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { builderTools } from './builder-tools.js';
 import { createField, createObject } from './schema-runner.js';
 import { FIELD_TYPES } from './types.js';
 import * as records from './records.js';
@@ -6,13 +7,14 @@ import { filterSchemaFor, inputSchemaFor, type RecordContext } from './records.j
 import type { Databases } from './db.js';
 import type { Metadata, ObjectDefinition, Principal } from './types.js';
 import type { PermissionSet } from './permissions.js';
+import type { Session } from './session.js';
 
 export type ToolAnnotations = { readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean };
 
 export type ToolDefinition = {
   name: string;
   description: string;
-  category: 'data' | 'schema';
+  category: 'data' | 'schema' | 'builder';
   inputSchema: z.ZodType;
   annotations: ToolAnnotations;
   run: (args: any) => Promise<unknown>;
@@ -23,11 +25,12 @@ export type ToolEnvironment = {
   principal: Principal;
   metadata: Metadata;
   permissions: PermissionSet;
+  session: Session;
 };
 
-const READ: ToolAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
-const WRITE: ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false };
-const DESTRUCTIVE: ToolAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: false };
+export const READ: ToolAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
+export const WRITE: ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false };
+export const DESTRUCTIVE: ToolAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: false };
 
 const idSchema = z.object({ id: z.uuid() });
 
@@ -132,4 +135,5 @@ const schemaTools = (env: ToolEnvironment): ToolDefinition[] => {
 export const buildTools = (env: ToolEnvironment): ToolDefinition[] => [
   ...env.metadata.objects.flatMap((object) => objectTools(env, object)),
   ...schemaTools(env),
+  ...builderTools(env),
 ];

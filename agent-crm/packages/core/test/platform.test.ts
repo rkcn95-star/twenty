@@ -8,6 +8,7 @@ let databases: Databases;
 let a: Awaited<ReturnType<typeof seedWorkspace>>;
 let b: Awaited<ReturnType<typeof seedWorkspace>>;
 
+const dataTools = (session: Session) => session.toolNames().filter((name) => /_deals?$/.test(name)).sort();
 const adminSession = (seed: typeof a) => Session.open(databases, seed.admin.principal);
 
 beforeAll(async () => {
@@ -73,7 +74,7 @@ describe('RBAC through the tool layer', () => {
     await admin.execute('create_one_deal', { data: { title: 'Visible', secret: 'hunter2' } });
 
     const session = await Session.open(databases, principal);
-    expect(session.toolNames().sort()).toEqual(['find_many_deals', 'find_one_deal']);
+    expect(dataTools(session)).toEqual(['find_many_deals', 'find_one_deal']);
     const found = (await session.execute('find_many_deals', { filter: { title: 'Visible' } })) as { records: Record<string, unknown>[] };
     expect(found.records).toHaveLength(1);
     expect(found.records[0]).not.toHaveProperty('secret');
@@ -109,7 +110,7 @@ describe('RBAC through the tool layer', () => {
 
     expect((await Session.open(databases, agent)).toolNames()).toContain('create_one_deal');
     const delegated = await Session.open(databases, agent, user.id);
-    expect(delegated.toolNames().sort()).toEqual(['find_many_deals', 'find_one_deal']);
+    expect(dataTools(delegated)).toEqual(['find_many_deals', 'find_one_deal']);
   });
 });
 

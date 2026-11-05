@@ -14,6 +14,7 @@ export const compilePredicates = (
   object: ObjectDefinition,
   principalId: string,
   firstParamIndex: number,
+  tableAlias?: string,
 ): CompiledCondition => {
   if (groups === null) return { sql: 'TRUE', params: [] };
   const params: unknown[] = [];
@@ -22,11 +23,12 @@ export const compilePredicates = (
     return `$${firstParamIndex + params.length - 1}`;
   };
 
+  const prefix = tableAlias ? `${tableAlias}.` : '';
   const columnFor = (fieldName: string): string => {
-    if (SYSTEM_COLUMNS.has(fieldName)) return quoteIdent(fieldName);
+    if (SYSTEM_COLUMNS.has(fieldName)) return `${prefix}${quoteIdent(fieldName)}`;
     const field = object.fields.find((candidate) => candidate.name === fieldName && candidate.active);
     if (!field) throw new AppError('validation', `Row predicate references unknown field "${fieldName}"`);
-    return quoteIdent(columnNameOf(field));
+    return `${prefix}${quoteIdent(columnNameOf(field))}`;
   };
 
   const groupSql = groups.map((group) => {

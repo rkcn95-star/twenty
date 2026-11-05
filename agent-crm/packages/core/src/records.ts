@@ -13,6 +13,7 @@ export type RecordContext = {
   object: ObjectDefinition;
   permissions: PermissionSet;
   principal: Principal;
+  client?: pg.PoolClient;
 };
 
 export type RecordRow = Record<string, unknown>;
@@ -24,17 +25,19 @@ const MAX_LIMIT = 100;
 const idsWhere = (permissions: PermissionSet, check: (access: { read: boolean; create: boolean; update: boolean; delete: boolean }) => boolean) =>
   [...permissions.objects].filter(([, access]) => check(access)).map(([objectId]) => objectId);
 
-const prepareSession = (ctx: RecordContext) => async (client: pg.PoolClient) => {
+export const applySessionSettings = async (client: pg.PoolClient, workspaceId: string, permissions: PermissionSet) => {
   const settings: [string, string][] = [
-    ['app.workspace_id', ctx.metadata.workspaceId],
-    ['app.read_objects', idsWhere(ctx.permissions, (access) => access.read).join(',')],
-    ['app.write_objects', idsWhere(ctx.permissions, (access) => access.create || access.update || access.delete).join(',')],
+    ['app.workspace_id', workspaceId],
+    ['app.read_objects', idsWhere(permissions, (access) => access.read).join(',')],
+    ['app.write_objects', idsWhere(permissions, (access) => access.create || access.update || access.delete).join(',')],
   ];
   for (const [name, value] of settings) await client.query('SELECT set_config($1, $2, true)', [name, value]);
 };
 
 const withRls = <TResult>(ctx: RecordContext, work: (client: pg.PoolClient) => Promise<TResult>) =>
-  inTransaction(ctx.runtime, work, prepareSession(ctx));
+  ctx.client
+    ? work(ctx.client)
+    : inTransaction(ctx.runtime, work, (client) => applySessionSettings(client, ctx.metadata.workspaceId, ctx.permissions));
 
 const tableOf = (ctx: RecordContext) => `${quoteIdent(ctx.metadata.schemaName)}.${quoteIdent(ctx.object.namePlural)}`;
 
