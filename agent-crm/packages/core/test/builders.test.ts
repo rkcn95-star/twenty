@@ -103,6 +103,20 @@ describe('report builder', () => {
     expect(result.rows.map((row) => row.total)).toEqual([150, 30]);
   });
 
+  it('reads back and deletes saved definitions', async () => {
+    await exec(admin, 'save_report', { name: 'temp_report', definition: { source: 'deals', columns: [{ key: 'n', aggregate: 'count' }] } });
+    const stored = await exec(admin, 'get_definition', { kind: 'report', name: 'temp_report' });
+    expect(stored.definition.source).toBe('deals');
+    await exec(admin, 'delete_definition', { kind: 'report', name: 'temp_report' });
+    await expect(exec(admin, 'get_definition', { kind: 'report', name: 'temp_report' })).rejects.toThrow(/No report named/);
+    await expect(exec(admin, 'delete_definition', { kind: 'report', name: 'temp_report' })).rejects.toThrow(/No report named/);
+    const viewer = await makeUser('definition_viewer', async (roleId) => {
+      await setObjectPermission(databases.admin, roleId, ids.deals!, { read: true });
+    });
+    expect(viewer.toolNames()).toContain('get_definition');
+    expect(viewer.toolNames()).not.toContain('delete_definition');
+  });
+
   it('saves a report, runs it by name and shows parameterised SQL', async () => {
     await exec(admin, 'save_report', { name: 'revenue_by_company', definition: revenueByCompany });
     expect((await exec<Rows>(admin, 'run_report', { name: 'revenue_by_company' })).rows).toHaveLength(3);

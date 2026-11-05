@@ -4,6 +4,7 @@ Scaffold for a multi-tenant, agent-first CRM platform. Every business object is 
 
 ## Layout
 
+- `apps/web`: Next.js app (App Router, TanStack Query and Table, shadcn/ui on Tailwind v4) in a compact, Twenty-inspired style.
 - `packages/core`: migrations, schema runner, permissions, row predicates, record service, tool registry, `Session.execute`.
 - `apps/server`: Hono REST API and the MCP endpoint.
 
@@ -28,6 +29,25 @@ Scaffold for a multi-tenant, agent-first CRM platform. Every business object is 
   - *Data grids:* compiled through the report engine. Actions: `set_fields`, `delete` (atomic), `run_tool`, and `open_form` (client side).
   - Tools: `save_form|grid|report`, `list_definitions`, `describe_form`, `submit_form`, `run_grid`, `run_grid_action`, `run_report`, `preview_report_sql`.
 - **MCP.** `POST /mcp` with a bearer API key. Default mode exposes `get_tool_catalog`, `learn_tools`, `execute_tool`, `list_object_metadata`, `load_skill`. `/mcp?mode=direct` lists every permitted tool.
+
+## Web app
+
+Sign up and sign in (email verified over SMTP, Google optional), a workspace switcher, a data-model editor, a generic record table for every object (sort, filter, page, create, edit, delete, relations shown by name), a visual report builder (joins, aggregates, date buckets, filters, charts, live SQL preview, save and reopen), and settings for members and API keys, roles (capabilities, object matrix, field access, row rules), sign-in methods and the audit log.
+
+The browser talks to one origin: Next proxies `/api/auth/*` and `/v1/*` to the API server, so the Better Auth session cookie needs no CORS. Set the server's `APP_URL` to the web origin.
+
+```bash
+docker compose up -d                 # Postgres and a mail catcher (Mailpit, http://localhost:8025)
+npm install
+set -a; . ./.env.example; set +a     # or copy to .env and adjust
+npm run dev:server                   # API on :3000
+npm run dev:web                      # web on :3001
+npm run smoke                        # drives the web app in a browser; needs the three above and the dev mail sink
+```
+
+`npm run dev:smtp` is a tiny mail sink that writes each email to `apps/server/.dev-mail/`; the smoke test reads verification links from there (use it instead of Mailpit when running the smoke test).
+
+Not in the UI yet: the form and data grid designers and their runtime pages (the backend and tools exist), many-to-many fields in tables and forms, dark mode, and workspace invitation acceptance pages.
 
 ## Run
 

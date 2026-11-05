@@ -19,7 +19,7 @@ export const loadMetadata = async (admin: pg.Pool, workspaceId: string): Promise
 
   const [objectRows, fieldRows] = await Promise.all([
     admin.query('SELECT * FROM core.object_definitions WHERE data_model_id = $1 ORDER BY created_at', [header.data_model_id]),
-    admin.query('SELECT * FROM core.field_definitions WHERE data_model_id = $1 ORDER BY name', [header.data_model_id]),
+    admin.query('SELECT * FROM core.field_definitions WHERE data_model_id = $1 ORDER BY created_at, name', [header.data_model_id]),
   ]);
   const fieldsByObject = new Map<string, FieldDefinition[]>();
   for (const row of fieldRows.rows) {

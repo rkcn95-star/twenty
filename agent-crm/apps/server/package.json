@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:smtp": "tsx scripts/dev-smtp.ts"
   },
   "dependencies": {
     "@agent-crm/core": "*",

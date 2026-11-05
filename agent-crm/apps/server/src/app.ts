@@ -93,6 +93,22 @@ export const createApp = (databases: Databases, adminToken: string, options: App
     return session;
   };
 
+  // What the web app needs to render: the objects and fields the caller may see, and what they may manage.
+  app.get('/v1/metadata', async (c) => {
+    const session = await requireSession(c);
+    return c.json({
+      workspaceId: session.principal.workspaceId,
+      tenancy: session.metadata.tenancy,
+      canManageSchema: session.permissions.canManageSchema && session.metadata.tenancy === 'isolated',
+      canBuild: session.permissions.canManageSchema,
+      canManageAccess: session.permissions.canManageAccess,
+      objects: session.objectMetadata().map((object) => ({
+        ...object,
+        access: session.permissions.objects.get(object.id) ?? { read: false, create: false, update: false, delete: false },
+      })),
+    });
+  });
+
   mountManagementRoutes(app, databases, requireSession);
 
   if (options.auth) {

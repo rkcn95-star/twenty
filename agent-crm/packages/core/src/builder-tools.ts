@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEFINITION_KINDS, fetchDefinition, listDefinitions, upsertDefinition, type DefinitionKind } from './definitions.js';
+import { DEFINITION_KINDS, deleteDefinition, fetchDefinition, fetchRawDefinition, listDefinitions, upsertDefinition, type DefinitionKind } from './definitions.js';
 import { AppError } from './errors.js';
 import { IDENTIFIER_KEY } from './filters.js';
 import {
@@ -70,6 +70,14 @@ export const builderTools = (env: ToolEnvironment): ToolDefinition[] => {
       annotations: READ,
       inputSchema: z.object({ kind: z.enum(DEFINITION_KINDS).optional() }),
       run: (args) => listDefinitions(admin, workspaceId, args.kind),
+    },
+    {
+      name: 'get_definition',
+      description: 'Read a saved form, grid or report definition exactly as stored, to edit it.',
+      category: 'builder',
+      annotations: READ,
+      inputSchema: z.object({ kind: z.enum(DEFINITION_KINDS), name: nameSchema }),
+      run: (args) => fetchRawDefinition(admin, workspaceId, args.kind, args.name),
     },
     {
       name: 'describe_form',
@@ -166,6 +174,14 @@ export const builderTools = (env: ToolEnvironment): ToolDefinition[] => {
 
   if (env.permissions.canManageSchema) {
     tools.push(
+      {
+        name: 'delete_definition',
+        description: 'Delete a saved form, grid or report.',
+        category: 'builder',
+        annotations: DESTRUCTIVE,
+        inputSchema: z.object({ kind: z.enum(DEFINITION_KINDS), name: nameSchema }),
+        run: (args) => deleteDefinition(admin, workspaceId, args.kind, args.name),
+      },
       {
         name: 'save_form',
         description: 'Create or replace a form definition: single, multi (several linked objects) or parent_child (header plus repeating rows).',

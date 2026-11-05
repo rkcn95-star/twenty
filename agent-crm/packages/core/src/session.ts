@@ -113,6 +113,7 @@ export class Session {
             label: field.label,
             type: field.type,
             options: field.options,
+            relationObjectId: field.relationObjectId,
             readOnly: this.permissions.readOnlyFieldIds.has(field.id),
           })),
       }));

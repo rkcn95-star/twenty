@@ -2,3 +2,6 @@ node_modules
 dist
 *.tsbuildinfo
 .env
+.next
+.dev-mail
+next-env.d.ts

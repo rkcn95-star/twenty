@@ -192,8 +192,8 @@ export const createField = async (admin: pg.Pool, dataModelId: string, objectId:
     }
 
     const inserted = await client.query(
-      `INSERT INTO core.field_definitions (data_model_id, object_id, name, label, type, options, relation_object_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      `INSERT INTO core.field_definitions (data_model_id, object_id, name, label, type, options, relation_object_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, clock_timestamp()) RETURNING id`,
       [dataModelId, objectId, name, input.label, input.type, options ? JSON.stringify(options) : null, input.relationObjectId ?? null],
     );
     const fieldId = inserted.rows[0].id as string;

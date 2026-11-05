@@ -48,3 +48,18 @@ export const listDefinitions = async (admin: pg.Pool, workspaceId: string, kind?
   );
   return result.rows;
 };
+
+export const fetchRawDefinition = async (admin: pg.Pool, workspaceId: string, kind: DefinitionKind, name: string) => {
+  const result = await admin.query('SELECT definition, updated_at FROM core.definitions WHERE workspace_id = $1 AND kind = $2 AND name = $3', [
+    workspaceId,
+    kind,
+    name,
+  ]);
+  if (!result.rows[0]) throw new AppError('not_found', `No ${kind} named "${name}"`);
+  return { kind, name, definition: result.rows[0].definition as unknown, updatedAt: result.rows[0].updated_at as Date };
+};
+
+export const deleteDefinition = async (admin: pg.Pool, workspaceId: string, kind: DefinitionKind, name: string) => {
+  const result = await admin.query('DELETE FROM core.definitions WHERE workspace_id = $1 AND kind = $2 AND name = $3', [workspaceId, kind, name]);
+  if (result.rowCount === 0) throw new AppError('not_found', `No ${kind} named "${name}"`);
+};
