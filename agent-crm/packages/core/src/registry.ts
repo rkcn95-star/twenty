@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { builderTools } from './builder-tools.js';
+import { linkTools } from './links.js';
 import { createField, createObject } from './schema-runner.js';
 import { FIELD_TYPES } from './types.js';
 import * as records from './records.js';
@@ -135,6 +136,7 @@ const schemaTools = (env: ToolEnvironment): ToolDefinition[] => {
 
 export const buildTools = (env: ToolEnvironment): ToolDefinition[] => [
   ...env.metadata.objects.flatMap((object) => objectTools(env, object)),
+  ...linkTools(env),
   ...schemaTools(env),
   ...builderTools(env),
 ];

@@ -5,7 +5,7 @@ import { AppError } from './errors.js';
 import { quoteIdent } from './identifiers.js';
 import type { PermissionSet } from './permissions.js';
 import { compilePredicates } from './predicates.js';
-import { columnNameOf, type FieldDefinition, type Metadata, type ObjectDefinition, type Principal } from './types.js';
+import { columnNameOf, hasColumn, type FieldDefinition, type Metadata, type ObjectDefinition, type Principal } from './types.js';
 
 export type RecordContext = {
   runtime: pg.Pool;
@@ -54,28 +54,28 @@ const withRls = <TResult>(ctx: RecordContext, work: (client: pg.PoolClient) => P
       : inTransaction(ctx.runtime, work, (client) => applySessionSettings(client, ctx.metadata.workspaceId, ctx.permissions)),
   );
 
-const tableOf = (ctx: RecordContext) => `${quoteIdent(ctx.metadata.schemaName)}.${quoteIdent(ctx.object.namePlural)}`;
+export const tableOf = (ctx: RecordContext) => `${quoteIdent(ctx.metadata.schemaName)}.${quoteIdent(ctx.object.namePlural)}`;
 
 const activeFields = (ctx: RecordContext, filter: (field: FieldDefinition) => boolean = () => true) =>
-  ctx.object.fields.filter((field) => field.active && filter(field));
+  ctx.object.fields.filter((field) => field.active && hasColumn(field) && filter(field));
 
 const readableFields = (ctx: RecordContext) => activeFields(ctx, (field) => !ctx.permissions.hiddenFieldIds.has(field.id));
 const writableFields = (ctx: RecordContext) =>
   readableFields(ctx).filter((field) => !ctx.permissions.readOnlyFieldIds.has(field.id));
 
-const selectList = (ctx: RecordContext): string =>
+export const selectList = (ctx: RecordContext): string =>
   [
     ...SYSTEM_SELECT.map(quoteIdent),
     ...readableFields(ctx).map((field) => `${quoteIdent(columnNameOf(field))} AS ${quoteIdent(field.name)}`),
   ].join(', ');
 
-const requireAccess = (ctx: RecordContext, action: 'read' | 'create' | 'update' | 'delete') => {
+export const requireAccess = (ctx: RecordContext, action: 'read' | 'create' | 'update' | 'delete') => {
   if (!ctx.permissions.objects.get(ctx.object.id)?.[action]) {
     throw new AppError('forbidden', `No ${action} access to ${ctx.object.namePlural}`);
   }
 };
 
-const rowCondition = (ctx: RecordContext, firstParamIndex: number) =>
+export const rowCondition = (ctx: RecordContext, firstParamIndex: number) =>
   compilePredicates(ctx.permissions.predicates.get(ctx.object.id) ?? null, ctx.object, ctx.principal.id, firstParamIndex);
 
 const zodForField = (field: FieldDefinition): z.ZodType => {
@@ -90,6 +90,7 @@ const zodForField = (field: FieldDefinition): z.ZodType => {
     case 'multi_select': return z.array(z.enum((field.options ?? []) as [string, ...string[]]));
     case 'json': return z.json();
     case 'relation': return z.uuid();
+    case 'many_to_many': return z.array(z.uuid());
   }
 };
 

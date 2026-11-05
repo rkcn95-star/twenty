@@ -20,12 +20,12 @@ export const createRole = async (
 export const createPrincipal = async (
   admin: pg.Pool,
   workspaceId: string,
-  input: { kind: Principal['kind']; name: string; email?: string; roleIds: string[] },
+  input: { kind: Principal['kind']; name: string; email?: string; roleIds: string[]; expiresAt?: Date },
 ): Promise<{ principal: Principal; apiKey?: string }> => {
   const apiKey = input.kind === 'user' ? undefined : `ak_${randomBytes(24).toString('base64url')}`;
   const result = await admin.query(
-    'INSERT INTO core.principals (workspace_id, kind, name, email, key_hash) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-    [workspaceId, input.kind, input.name, input.email ?? null, apiKey ? hashKey(apiKey) : null],
+    'INSERT INTO core.principals (workspace_id, kind, name, email, key_hash, expires_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+    [workspaceId, input.kind, input.name, input.email ?? null, apiKey ? hashKey(apiKey) : null, input.expiresAt ?? null],
   );
   const id = result.rows[0].id as string;
   for (const roleId of input.roleIds) {
@@ -35,9 +35,17 @@ export const createPrincipal = async (
 };
 
 export const authenticate = async (admin: pg.Pool, apiKey: string): Promise<Principal> => {
-  const result = await admin.query('SELECT id, workspace_id, kind, name FROM core.principals WHERE key_hash = $1', [hashKey(apiKey)]);
+  const result = await admin.query(
+    `SELECT id, workspace_id, kind, name FROM core.principals
+     WHERE key_hash = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`,
+    [hashKey(apiKey)],
+  );
   const row = result.rows[0];
   if (!row) throw new AppError('forbidden', 'Invalid API key');
+  // Throttled so authentication is not a write on every request.
+  void admin
+    .query("UPDATE core.principals SET last_used_at = now() WHERE id = $1 AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')", [row.id])
+    .catch(() => undefined);
   return { id: row.id, workspaceId: row.workspace_id, kind: row.kind, name: row.name };
 };
 
@@ -82,3 +90,22 @@ export const addRowPredicate = (
     predicate.operator,
     JSON.stringify(predicate.value ?? null),
   ]);
+
+export const revokeKey = async (admin: pg.Pool, workspaceId: string, principalId: string) => {
+  const result = await admin.query('UPDATE core.principals SET revoked_at = now() WHERE id = $1 AND workspace_id = $2 AND key_hash IS NOT NULL', [
+    principalId,
+    workspaceId,
+  ]);
+  if (result.rowCount === 0) throw new AppError('not_found', 'Key not found');
+};
+
+// Replaces the key and clears any revocation; the old key stops working immediately.
+export const rotateKey = async (admin: pg.Pool, workspaceId: string, principalId: string, expiresAt?: Date): Promise<string> => {
+  const apiKey = `ak_${randomBytes(24).toString('base64url')}`;
+  const result = await admin.query(
+    'UPDATE core.principals SET key_hash = $3, revoked_at = NULL, expires_at = $4 WHERE id = $1 AND workspace_id = $2 AND key_hash IS NOT NULL',
+    [principalId, workspaceId, hashKey(apiKey), expiresAt ?? null],
+  );
+  if (result.rowCount === 0) throw new AppError('not_found', 'Key not found');
+  return apiKey;
+};

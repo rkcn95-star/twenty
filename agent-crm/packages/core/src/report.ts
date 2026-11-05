@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { inTransaction } from './db.js';
 import { AppError } from './errors.js';
 import { IDENTIFIER_KEY, fieldRefSchema, filterGroupSchema, isGroup, type FieldRef, type FilterCondition, type FilterGroup } from './filters.js';
-import { quoteIdent } from './identifiers.js';
+import { junctionTableName, quoteIdent } from './identifiers.js';
 import type { PermissionSet } from './permissions.js';
 import { compilePredicates } from './predicates.js';
 import { applySessionSettings } from './records.js';
@@ -81,7 +81,7 @@ export const compileReport = (definition: ReportDefinition, view: ReportView): C
     if (scopes.has(join.alias)) throw new AppError('validation', `Duplicate join alias "${join.alias}"`);
     const from = scopes.get(join.from ?? 'root');
     if (!from) throw new AppError('validation', `Unknown join source "${join.from}"`);
-    const field = from.object.fields.find((candidate) => candidate.name === join.field && candidate.active && candidate.type === 'relation');
+    const field = from.object.fields.find((candidate) => candidate.name === join.field && candidate.active && (candidate.type === 'relation' || candidate.type === 'many_to_many'));
     if (!field || permissions.hiddenFieldIds.has(field.id)) throw new AppError('validation', `"${join.field}" is not a relation you can follow`);
     const target = metadata.objects.find((object) => object.id === field.relationObjectId);
     if (!target) throw new AppError('validation', `Relation "${join.field}" has no target`);
@@ -89,10 +89,19 @@ export const compileReport = (definition: ReportDefinition, view: ReportView): C
     const sqlAlias = `t${scopes.size}`;
     const rowRule = compilePredicates(permissions.predicates.get(target.id) ?? null, target, principal.id, params.length + 1, sqlAlias);
     params.push(...rowRule.params);
-    joinSql.push(
-      `LEFT JOIN ${schema}.${quoteIdent(target.namePlural)} ${sqlAlias} ON ${from.sqlAlias}.${quoteIdent(columnNameOf(field))} = ${sqlAlias}.id` +
-        ` AND ${sqlAlias}.deleted_at IS NULL AND ${rowRule.sql}`,
-    );
+    const targetJoin = `${schema}.${quoteIdent(target.namePlural)} ${sqlAlias}`;
+    if (field.type === 'many_to_many') {
+      const linkAlias = `l${scopes.size}`;
+      joinSql.push(
+        `LEFT JOIN ${schema}.${quoteIdent(junctionTableName(field.id))} ${linkAlias} ON ${linkAlias}.source_id = ${from.sqlAlias}.id`,
+        `LEFT JOIN ${targetJoin} ON ${sqlAlias}.id = ${linkAlias}.target_id AND ${sqlAlias}.deleted_at IS NULL AND ${rowRule.sql}`,
+      );
+    } else {
+      joinSql.push(
+        `LEFT JOIN ${targetJoin} ON ${from.sqlAlias}.${quoteIdent(columnNameOf(field))} = ${sqlAlias}.id` +
+          ` AND ${sqlAlias}.deleted_at IS NULL AND ${rowRule.sql}`,
+      );
+    }
     scopes.set(join.alias, { sqlAlias, object: target });
   }
 
@@ -103,6 +112,7 @@ export const compileReport = (definition: ReportDefinition, view: ReportView): C
     if (systemType) return { expr: `${scope.sqlAlias}.${quoteIdent(ref.field)}`, type: systemType };
     const field = scope.object.fields.find((candidate) => candidate.name === ref.field && candidate.active);
     if (!field || permissions.hiddenFieldIds.has(field.id)) throw new AppError('validation', `Unknown field "${ref.field}"`);
+    if (field.type === 'many_to_many') throw new AppError('validation', `"${ref.field}" is many-to-many; follow it with a join`);
     return { expr: `${scope.sqlAlias}.${quoteIdent(columnNameOf(field))}`, type: field.type };
   };
 

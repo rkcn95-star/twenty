@@ -15,6 +15,8 @@ Scaffold for a multi-tenant, agent-first CRM platform. Every business object is 
   - Metadata and access config live in `core`.
 - **Objects.** `create_object` (isolated models)  / `create_field` run DDL and metadata inserts in one transaction: one table per object, one column per field. Select fields use `text` plus a `CHECK`; relations are `<name>_id uuid` foreign keys.
 - **RLS.** Every generated table has `FORCE ROW LEVEL SECURITY` and four policies for the `app_runtime` role. The workspace id and object id are baked into the policy; the request sets `app.workspace_id`, `app.read_objects` and `app.write_objects` with transaction-local `set_config`.
+- **Many-to-many.** A `many_to_many` field creates a junction table (`jn_<field id>`) with its own RLS: reads need access to both objects, writes need write access to the source. Records never carry the links; use `list_links`, `add_links`, `remove_links` and `set_links`. Links respect the target's row rules, and reports can join across them. In shared mode the junction uses composite `(workspace_id, id)` keys, so links cannot cross tenants.
+- **Machine clients.** API keys can expire, be revoked and be rotated (`revokeKey`, `rotateKey`); `last_used_at` is tracked. Agents and keys are principals with roles like any user.
 - **Roles.** Object CRUD flags, field hidden/read-only flags, and row predicates (`created_by eq $principal`). Create, update and delete are checked in the service; RLS enforces read vs write per object.
 - **Agents.** An agent acting for a user (`x-on-behalf-of` header) gets the intersection of both permission sets.
 - **Tools.** Per object: `find_many_<plural>`, `find_one_<singular>`, `create_one_`, `update_one_`, `delete_one_`. Schema tools need the schema permission. All calls go through `Session.execute`, which validates, authorizes and audits.
@@ -57,7 +59,9 @@ curl -X POST localhost:3000/v1/bootstrap -H "x-admin-token: $ADMIN_TOKEN" -H 'co
 
 - The visual builders and runtime renderers (the UI that produces and consumes these definitions).
 - Conditional form logic, computed fields, reverse (one-to-many) joins in reports, raw SQL mode, dashboards, installable app bundles.
-- Auth for human users (sessions, SSO), invites, an API for managing roles and predicates (use `core/src/access.ts` for now).
+- Human login (planned: Better Auth with Google and email plus password with verification), invites, and an HTTP API for managing roles, predicates and keys (use `core/src/access.ts` for now).
+- Bring-your-own model keys (encrypted per workspace) and the in-app agent that would use them.
+- Many-to-many fields in forms and grids.
 - `search` field type, many-to-many relations, field rename and type change, keyset pagination.
 - Approvals for destructive tools, OAuth 2.1 on the MCP endpoint, rate limits, billing.
 - Web app.

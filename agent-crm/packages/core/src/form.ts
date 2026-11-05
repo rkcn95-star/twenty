@@ -74,7 +74,7 @@ const objectByName = (metadata: Metadata, plural: string): ObjectDefinition => {
 
 const assertFieldsExist = (object: ObjectDefinition, fields: FormField[]) => {
   for (const field of fields) {
-    if (!object.fields.some((candidate) => candidate.name === field.name && candidate.active)) {
+    if (!object.fields.some((candidate) => candidate.name === field.name && candidate.active && candidate.type !== 'many_to_many')) {
       throw new AppError('validation', `Object "${object.namePlural}" has no field "${field.name}"`);
     }
   }

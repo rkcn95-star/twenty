@@ -27,7 +27,7 @@ export const compilePredicates = (
   const columnFor = (fieldName: string): string => {
     if (SYSTEM_COLUMNS.has(fieldName)) return `${prefix}${quoteIdent(fieldName)}`;
     const field = object.fields.find((candidate) => candidate.name === fieldName && candidate.active);
-    if (!field) throw new AppError('validation', `Row predicate references unknown field "${fieldName}"`);
+    if (!field || field.type === 'many_to_many') throw new AppError('validation', `Row predicate references unknown field "${fieldName}"`);
     return `${prefix}${quoteIdent(columnNameOf(field))}`;
   };
 

@@ -50,10 +50,10 @@ export const validateGridDefinition = (definition: GridDefinition, metadata: Met
     if (column.via) {
       const relation = object.fields.find((field) => field.name === column.via && field.active && field.type === 'relation');
       const target = metadata.objects.find((candidate) => candidate.id === relation?.relationObjectId);
-      if (!relation || !target?.fields.some((field) => field.name === column.field && field.active)) {
+      if (!relation || !target?.fields.some((field) => field.name === column.field && field.active && field.type !== 'many_to_many')) {
         throw new AppError('validation', `Column "${column.via}.${column.field}" does not exist`);
       }
-    } else if (!object.fields.some((field) => field.name === column.field && field.active)) {
+    } else if (!object.fields.some((field) => field.name === column.field && field.active && field.type !== 'many_to_many')) {
       throw new AppError('validation', `Column "${column.field}" does not exist`);
     }
   }

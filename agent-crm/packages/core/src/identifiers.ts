@@ -24,3 +24,5 @@ export const quoteIdent = (name: string): string => `"${name.replaceAll('"', '""
 
 export const dataModelSchemaName = (dataModelId: string, tenancy: 'isolated' | 'shared'): string =>
   `${tenancy === 'shared' ? 'shared' : 'ws'}_${assertUuid(dataModelId).replaceAll('-', '')}`;
+
+export const junctionTableName = (fieldId: string): string => `jn_${assertUuid(fieldId).replaceAll('-', '')}`;
