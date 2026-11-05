@@ -8,11 +8,11 @@ const hashKey = (key: string): string => createHash('sha256').update(key).digest
 export const createRole = async (
   admin: pg.Pool,
   workspaceId: string,
-  input: { name: string; canManageSchema?: boolean; allObjectsAccess?: boolean },
+  input: { name: string; canManageSchema?: boolean; allObjectsAccess?: boolean; canBypassAuth?: boolean },
 ): Promise<string> => {
   const result = await admin.query(
-    'INSERT INTO core.roles (workspace_id, name, can_manage_schema, all_objects_access) VALUES ($1, $2, $3, $4) RETURNING id',
-    [workspaceId, input.name, input.canManageSchema ?? false, input.allObjectsAccess ?? false],
+    'INSERT INTO core.roles (workspace_id, name, can_manage_schema, all_objects_access, can_bypass_auth) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+    [workspaceId, input.name, input.canManageSchema ?? false, input.allObjectsAccess ?? false, input.canBypassAuth ?? false],
   );
   return result.rows[0].id;
 };

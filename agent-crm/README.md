@@ -16,7 +16,8 @@ Scaffold for a multi-tenant, agent-first CRM platform. Every business object is 
 - **Objects.** `create_object` (isolated models)  / `create_field` run DDL and metadata inserts in one transaction: one table per object, one column per field. Select fields use `text` plus a `CHECK`; relations are `<name>_id uuid` foreign keys.
 - **RLS.** Every generated table has `FORCE ROW LEVEL SECURITY` and four policies for the `app_runtime` role. The workspace id and object id are baked into the policy; the request sets `app.workspace_id`, `app.read_objects` and `app.write_objects` with transaction-local `set_config`.
 - **Many-to-many.** A `many_to_many` field creates a junction table (`jn_<field id>`) with its own RLS: reads need access to both objects, writes need write access to the source. Records never carry the links; use `list_links`, `add_links`, `remove_links` and `set_links`. Links respect the target's row rules, and reports can join across them. In shared mode the junction uses composite `(workspace_id, id)` keys, so links cannot cross tenants.
-- **Machine clients.** API keys can expire, be revoked and be rotated (`revokeKey`, `rotateKey`); `last_used_at` is tracked. Agents and keys are principals with roles like any user.
+- **Human sign-in (Better Auth, tables in `core`).** Modelled on Twenty: one global identity (`core."user"`), a user principal per workspace membership (`principals.auth_user_id`, like `userWorkspace`), and per-workspace switches for password and Google sign-in with admin bypass flags (`workspaces.*_auth_enabled`, `*_auth_bypass_enabled`, `roles.can_bypass_auth`). The sign-in method is stored on the session and checked against the workspace on every request. Email and password requires a verified email, sent over SMTP. Google is enabled by setting `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (not exercised by the tests). Browser requests send the session cookie plus `x-workspace-id`; invitations are accepted by the invited verified email only.
+- **Machine clients.** API keys come first for programmatic access and take precedence over sessions. They can expire, be revoked and be rotated (`revokeKey`, `rotateKey`); `last_used_at` is tracked. Agents and keys are principals with roles like any user.
 - **Roles.** Object CRUD flags, field hidden/read-only flags, and row predicates (`created_by eq $principal`). Create, update and delete are checked in the service; RLS enforces read vs write per object.
 - **Agents.** An agent acting for a user (`x-on-behalf-of` header) gets the intersection of both permission sets.
 - **Tools.** Per object: `find_many_<plural>`, `find_one_<singular>`, `create_one_`, `update_one_`, `delete_one_`. Schema tools need the schema permission. All calls go through `Session.execute`, which validates, authorizes and audits.
@@ -59,7 +60,8 @@ curl -X POST localhost:3000/v1/bootstrap -H "x-admin-token: $ADMIN_TOKEN" -H 'co
 
 - The visual builders and runtime renderers (the UI that produces and consumes these definitions).
 - Conditional form logic, computed fields, reverse (one-to-many) joins in reports, raw SQL mode, dashboards, installable app bundles.
-- Human login (planned: Better Auth with Google and email plus password with verification), invites, and an HTTP API for managing roles, predicates and keys (use `core/src/access.ts` for now).
+- Approved email domains (auto-join), password reset, SSO/SAML per workspace, 2FA, and an HTTP API for managing roles, predicates and keys (use `core/src/access.ts` for now).
+- OAuth 2.1 for MCP clients (API keys work today).
 - Bring-your-own model keys (encrypted per workspace) and the in-app agent that would use them.
 - Many-to-many fields in forms and grids.
 - `search` field type, many-to-many relations, field rename and type change, keyset pagination.
